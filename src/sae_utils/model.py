@@ -1,8 +1,16 @@
+from typing import NamedTuple
+
 import torch
 from torch import Tensor, nn
 from torch.nn import Module
 
-from sae_utils.normalization import LayerNorm
+from sae_utils.normalization import LayerNorm, NormalizationParams
+
+
+class SAEResult(NamedTuple):
+    latents: Tensor
+    latents_pre_activation: Tensor
+    reconstructed_input: Tensor
 
 
 class SparseAE(Module):
@@ -33,17 +41,6 @@ class SparseAE(Module):
             epsilon (float, optional): Small value for numerical stability in
                 normalization. Defaults to 1e-7.
 
-        Attributes:
-            input_dim (int): Dimensionality of the input features.
-            latent_dim_factor (int): Factor for latent dimension calculation.
-            latent_dim (int): Dimensionality of the latent space.
-            activation (Module): Activation function.
-            epsilon (float): Numerical stability constant.
-            tied_bias (nn.Parameter): Bias parameter tied to the input dimension.
-            normalization (LayerNorm): Layer normalization module.
-            encoder (nn.Linear): Linear encoder layer.
-            decode (nn.Linear): Linear decoder layer with tied weights.
-
         """
         super().__init__()
 
@@ -69,11 +66,10 @@ class SparseAE(Module):
         # Tied weights
         self.decode.weight.data = self.encoder.weight.data.T.clone()
 
-    def preprocessing(self, x: Tensor) -> tuple[Tensor, dict[str, Tensor]]:
+    def preprocessing(self, x: Tensor) -> tuple[Tensor, NormalizationParams]:
         """Normalize the input tensor and return normalization parameters."""
-        x, mu, std = self.normalization(x)
-        normalization = {"mu": mu, "std": std}
-        return x, normalization
+        x, params = self.normalization(x)
+        return x, params
 
     def encoder_pre_activation(self, x: Tensor) -> Tensor:
         """Compute the pre-activation output of the encoder.
@@ -91,50 +87,52 @@ class SparseAE(Module):
         z = self.encoder(x)
         return z
 
-    def decoder(self, z: Tensor, normalization: dict[str, Tensor]) -> Tensor:
+    def decoder(self, z: Tensor, norm: NormalizationParams) -> Tensor:
         """Decode the latent representation `z` into the reconstructed input tensor.
 
-        The decoding process involves passing the latent representation `z` through the
-        decoder layer, adding the tied bias, and then denormalizing the result using
-        the provided normalization parameters.
+        The decoding process involves:
+        1. Passing the latent representation `z` through the decoder layer.
+        2. Adding the tied bias to the decoded output.
+        3. Denormalizing the result using the provided normalization parameters.
 
         Args:
             z (Tensor): Latent representation tensor to be decoded.
-            normalization (dict[str, Tensor]): Dictionary containing normalization
-                parameters:
-                - "mu": Mean tensor for denormalization.
-                - "std": Standard deviation tensor for denormalization.
+            norm (NormalizationParams): NamedTuple containing normalization parameters:
+                - mu: Mean tensor for denormalization.
+                - std: Standard deviation tensor for denormalization.
 
         Returns:
             Tensor: The reconstructed input tensor after decoding and denormalization.
 
         """
         x_rec = self.decode(z) + self.tied_bias
-        x_rec = x_rec * (normalization["std"] + self.epsilon) + normalization["mu"]
+        x_rec = x_rec * (norm.std + self.epsilon) + norm.mu
         return x_rec
 
-    def forward(self, x: Tensor) -> dict[str, Tensor]:
-        """Perform a forward pass through the SAE.
+    def forward(self, x: Tensor) -> SAEResult:
+        """Perform a forward pass through the Sparse AutoEncoder (SAE).
+
+        This method normalizes the input, encodes it to a latent representation,
+        applies the activation function, and reconstructs the input from the latent
+        representation.
 
         Args:
             x (Tensor): Input tensor to be processed.
 
         Returns:
-            dict[str, Tensor]: A dictionary containing:
-                - "Latents": The latent representation after activation.
-                - "Latents pre-activation": The latent representation before activation.
-                - "Reconstructed input": The reconstructed input tensor.
+            SAEResult: NamedTuple containing:
+                - latents: Activated latent representation.
+                - latents_pre_activation: Latent representation before activation.
+                - reconstructed_input: Reconstructed input tensor.
 
         """
-        x, normalization = self.preprocessing(x)
+        x, norm = self.preprocessing(x)
         z_pre_activation = self.encoder_pre_activation(x)
         z = self.activation(z_pre_activation)
-        x_reconstructed = self.decode(z, normalization)
+        x_reconstructed = self.decoder(z, norm)
 
-        output = {
-            "Latents": z,
-            "Latents pre-activation": z_pre_activation,
-            "Reconstructed input": x_reconstructed,
-        }
-
-        return output
+        return SAEResult(
+            latents=z,
+            latents_pre_activation=z_pre_activation,
+            reconstructed_input=x_reconstructed,
+        )

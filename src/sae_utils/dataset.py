@@ -5,6 +5,8 @@ from torch.utils.data import Dataset, Subset
 
 
 class SAETrainingDataset(Dataset[Tensor]):
+    """A PyTorch Dataset for training Sparse Autoencoders (SAE) using tensor data."""
+
     def __init__(self, data: Tensor) -> None:
         """Initialize the SAETrainingDataset with the provided data tensor."""
         self.data = data
@@ -16,11 +18,6 @@ class SAETrainingDataset(Dataset[Tensor]):
     def __getitem__(self, idx: int) -> Tensor:
         """Retrieve a sample from the dataset by index."""
         return self.data[idx]
-
-    @property
-    def shape(self) -> tuple[int, ...]:
-        """Return the shape of the dataset as (num_samples, num_features)."""
-        return self.data.shape
 
 
 def tied_bias_initialization(
@@ -41,7 +38,7 @@ def tied_bias_initialization(
 
     """
     subset = Subset(dataset, indices=range(0, len(dataset), sample_every))
-    geom_med: Tensor = compute_geometric_median(subset).median
+    geom_med: Tensor = compute_geometric_median(subset[0:]).median  # type: ignore[SAETrainingDataset has a data attribute]
     if torch.cuda.is_available():
         return geom_med.cuda().to(torch.float32)
     return geom_med.to(torch.float32)

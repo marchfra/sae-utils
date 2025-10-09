@@ -58,17 +58,17 @@ def train_sae(
 
     print("Starting SAE training")
     print(f"Using activation function: {activation}")
-    print(f"Input dimension: {dataset.shape[-1]}")
+    print(f"Input dimension: {dataset.data.shape[-1]}")
     print(
         f"Latent dimension factor: {config.latent_dim_factor} | "
-        f"Latent dimension: {dataset.shape[-1] * config.latent_dim_factor}",
+        f"Latent dimension: {dataset.data.shape[-1] * config.latent_dim_factor}",
     )
     print(f"Learning rate: {learning_rate}")
     print(f"Number of epochs: {n_epochs}")
     print(f"Device: {device}")
 
     autoencoder = SparseAE(
-        input_dim=dataset.shape[-1],
+        input_dim=dataset.data.shape[-1],
         latent_dim_factor=config.latent_dim_factor,
         activation=activation,
     )
@@ -78,7 +78,7 @@ def train_sae(
 
     autoencoder.tied_bias.data = tied_bias_initialization(dataset)  # TODO: this is ugly
     autoencoder.to(device)
-    print(f"Dataset shape: {dataset.shape}")
+    print(f"Dataset shape: {dataset.data.shape}")
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
     dataloader = DataLoader(
         dataset=dataset,
@@ -90,23 +90,21 @@ def train_sae(
 
     losses: list[float] = []
     dead_neurons_counts = torch.zeros(autoencoder.latent_dim).to(device)
-    for _ in trange(n_epochs, desc="SAE training epoch"):
+    for _epochs in trange(n_epochs, desc="SAE training epoch"):
         for batch in tqdm(dataloader, desc="SAE training batch", leave=False):
             optimizer.zero_grad()
 
             x = batch.to(device=device, dtype=torch.float32)
-            # ? Why not call autoencoder.forward(x)?
-            x_norm, norm_dict = autoencoder.preprocessing(x)
-            z_pre_activation = autoencoder.encoder_pre_activation(x_norm)
-            z = autoencoder.activation(z_pre_activation)
-            x_reconstructed = autoencoder.decode(z, norm_dict)
+            result = autoencoder(x)
+
             loss_reconstruction = loss_reconstruction_fn(
-                input=x_reconstructed,
+                input=result.reconstructed_input,
                 target=x,
             )
 
+            # Update dead neurons counts and create mask
             dead_neurons_counts = update_dead_neuron_counts(
-                z=z.detach(),
+                z=result.latents.detach(),
                 prev_counts=dead_neurons_counts.clone(),
             )
             dead_neurons_mask = dead_neurons_counts > threshold_iterations_dead_latent
@@ -114,8 +112,7 @@ def train_sae(
             loss_aux = loss_k_aux(
                 autoencoder=autoencoder,
                 x=x,
-                x_reconstructed=x_reconstructed,
-                z_pre_activation=z_pre_activation,
+                sae_output=result,
                 dead_neurons_mask=dead_neurons_mask,
                 k_aux=config.k_aux,
             )

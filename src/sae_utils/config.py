@@ -25,7 +25,10 @@ class Config:
             raise FileNotFoundError(f"Config file {json_file} does not exist.")
 
         with json_file.open("r") as f:
-            config_dict = json.load(f)
+            try:
+                config_dict = json.load(f)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Error decoding JSON from {json_file}") from e
         return cls(**config_dict)
 
     def save_to_json(self, json_file: Path) -> None:

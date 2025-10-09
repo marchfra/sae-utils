@@ -1,5 +1,12 @@
+from typing import NamedTuple
+
 from torch import Tensor
 from torch.nn import Module
+
+
+class NormalizationParams(NamedTuple):
+    mu: Tensor
+    std: Tensor
 
 
 class LayerNorm(Module):
@@ -14,7 +21,7 @@ class LayerNorm(Module):
         super().__init__()
         self.eps = eps
 
-    def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor]:
+    def forward(self, x: Tensor) -> tuple[Tensor, NormalizationParams]:
         """Normalize the input tensor `x` along its last dimension.
 
         Args:
@@ -32,4 +39,4 @@ class LayerNorm(Module):
         x = x - mu
         std = x.std(dim=-1, keepdim=True)
         x = x / (std + self.eps)
-        return x, mu, std
+        return x, NormalizationParams(mu, std)
