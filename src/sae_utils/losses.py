@@ -4,52 +4,50 @@ from torch.nn import DataParallel
 from torch.nn.functional import mse_loss
 
 from sae_utils.activations import TopKActivation
-from sae_utils.model import SparseAE
+from sae_utils.model import SAEResult, SparseAE
 
-# Definition of loss functions for the Sparse Autoencoder (SAE)
-# def loss_reconstruction(x_reconstructed: Tensor, x: Tensor) -> Tensor:
-#     return F.mse_loss(x_reconstructed, x, reduction="mean")
-
-loss_reconstruction_fn = mse_loss  # ? Why use mse_loss instead of nn.MSELoss?
+loss_reconstruction_fn = mse_loss
 
 
 def loss_k_aux(
     autoencoder: SparseAE | DataParallel[SparseAE],
     x: Tensor,
-    x_reconstructed: Tensor,  # TODO: merge parameters into a dict from SAE.forward
-    z_pre_activation: Tensor,
+    sae_output: SAEResult,
     dead_neurons_mask: Tensor,
-    k_aux: int = 256,
+    k_aux: int = 512,
 ) -> Tensor:
-    # TODO: check documentation with the OpenAI article
     """Compute the auxiliary k-sparse loss for a sparse autoencoder.
 
     This loss measures the mean squared error (MSE) between the reconstruction error and
     its approximation using only the top-k activated neurons (after masking dead
     neurons). It encourages the autoencoder to reconstruct the input using a sparse
     subset of activations.
+    For more details, see https://cdn.openai.com/papers/sparse-autoencoders.pdf,
+    Sections 2.4 and A.2.
 
     Args:
         autoencoder (SparseAE | DataParallel[SparseAE]): The sparse autoencoder model
             with a decode method.
         x (Tensor): The original input tensor.
-        x_reconstructed (Tensor): The reconstructed input tensor from the autoencoder.
-        z_pre_activation (Tensor): The pre-activation tensor from the encoder.
+        sae_output (SAEResult): The output of the autoencoder's forward pass,
+            containing:
+            - latents (Tensor): The post-activation latent tensor.
+            - latents_pre_activation (Tensor): The pre-activation latent tensor.
+            - reconstructed_input (Tensor): The reconstructed input tensor.
         dead_neurons_mask (Tensor): A mask tensor indicating inactive (dead) neurons. A
             value of 1 indicates a dead neuron, and 0 indicates an active neuron.
         k_aux (int, optional): Number of top activations to use for the auxiliary loss.
-            Defaults to 256.
+            Defaults to 512.
 
     Returns:
         Tensor: The computed auxiliary k-sparse loss (MSE), with NaNs replaced by zero.
 
     """
-    e = x - x_reconstructed
+    e = x - sae_output.reconstructed_input
     topk_aux = TopKActivation(k=k_aux)
-    z_masked = z_pre_activation * dead_neurons_mask  # TODO: check if this is correct
-    e_cap = autoencoder.decode(topk_aux(z_masked))
-    L2_k_aux = mse_loss(e, e_cap, reduction="mean")  # noqa: N806
-    return L2_k_aux.nan_to_num(0)  # ? When would this be NaN?
+    dead_pre_activations = sae_output.latents_pre_activation * dead_neurons_mask
+    e_hat = autoencoder.decode(topk_aux(dead_pre_activations))
+    return mse_loss(e, e_hat, reduction="mean").nan_to_num(0)
 
 
 def loss_top_k(
