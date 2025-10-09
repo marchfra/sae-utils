@@ -1,0 +1,34 @@
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal
+
+
+@dataclass
+class Config:
+    """Configuration for SAE utils."""
+
+    n_epochs: int
+    batch_size: int
+    learning_rate: float
+    latent_dim_factor: int
+    k: int
+    threshold_iterations_dead_latent: int
+    alpha_aux_loss: float
+    activation: Literal["topk"] = "topk"
+    k_aux: int = 256
+
+    @classmethod
+    def from_json(cls, json_file: Path) -> "Config":
+        """Create Config instance from a JSON file."""
+        if not json_file.exists():
+            raise FileNotFoundError(f"Config file {json_file} does not exist.")
+
+        with json_file.open("r") as f:
+            config_dict = json.load(f)
+        return cls(**config_dict)
+
+    def save_to_json(self, json_file: Path) -> None:
+        """Save Config instance to a JSON file."""
+        with json_file.open("w") as f:
+            json.dump(self.__dict__, f, indent=2)
