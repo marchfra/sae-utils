@@ -21,3 +21,23 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.8.17,<0.9.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest>=8.4.2", "pytest-cov>=7.0.0"]
+
+[tool.pytest.ini_options]
+addopts = "-ra -q --cov=sae_utils --cov-report=html"
+testpaths = ["tests"]
+
+[tool.ruff]
+extend = "~/.config/ruff/ruff.toml"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",    # Ignore use of assert in tests
+    "ARG",     # flake8-unused-arguments
+    "FBT",     # flake8-boolean-trap
+    "PLR2004", # magic-value-comparison
+    "S311",    # suspiciuous-non-cryptographic-random-usage
+    "SLF001",  # Private member accessed
+]
