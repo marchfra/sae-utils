@@ -32,7 +32,7 @@ def test_config_from_json(config_file: Path) -> None:
     assert config.learning_rate == 1e-5
     assert config.activation == "topk"
     assert config.k == 128
-    assert config.threshold_iterations_dead_latent == 25_000
+    assert config.threshold_dead_latent == 25_000
     assert config.alpha_aux_loss == 1.0 / 32.0
     assert config.k_aux == 256
     assert config.batch_size == 256

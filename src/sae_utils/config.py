@@ -13,7 +13,7 @@ class Config:
     learning_rate: float
     latent_dim_factor: int
     k: int
-    threshold_iterations_dead_latent: int
+    threshold_dead_latent: int
     alpha_aux_loss: float
     activation: Literal["topk"] = "topk"
     k_aux: int = 256
