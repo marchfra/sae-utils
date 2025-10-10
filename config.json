@@ -1,0 +1,11 @@
+{
+  "n_epochs": 250,
+  "batch_size": 256,
+  "learning_rate": 1e-05,
+  "latent_dim_factor": 8,
+  "k": 128,
+  "threshold_dead_latent": 25000,
+  "alpha_aux_loss": 0.03125,
+  "activation": "topk",
+  "k_aux": 256
+}
