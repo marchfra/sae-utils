@@ -76,7 +76,7 @@ def train_sae(
         autoencoder = DataParallel(autoencoder)
     autoencoder = autoencoder.to(device)
 
-    autoencoder.tied_bias.data = tied_bias_initialization(dataset)  # TODO: this is ugly
+    autoencoder.tied_bias.data = tied_bias_initialization(dataset)
     autoencoder.to(device)
     print(f"Dataset shape: {dataset.data.shape}")
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)

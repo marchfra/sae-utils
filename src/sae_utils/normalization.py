@@ -5,6 +5,14 @@ from torch.nn import Module
 
 
 class NormalizationParams(NamedTuple):
+    """A NamedTuple that stores normalization parameters for data preprocessing.
+
+    Attributes:
+        mu (Tensor): The mean values used for normalization.
+        std (Tensor): The standard deviation values used for normalization.
+
+    """
+
     mu: Tensor
     std: Tensor
 

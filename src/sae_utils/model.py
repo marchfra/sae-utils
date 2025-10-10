@@ -8,9 +8,21 @@ from sae_utils.normalization import LayerNorm, NormalizationParams
 
 
 class SAEResult(NamedTuple):
+    """A NamedTuple that stores the results of a Sparse Autoencoder (SAE) forward pass.
+
+    Attributes:
+        latents (Tensor): The encoded latent representations produced by the SAE.
+        latents_pre_activation (Tensor): The latent representations before activation is
+            applied.
+        reconstructed_input (Tensor): The input reconstructed by the SAE decoder.
+        norm (NormalizationParams): Parameters used for input normalization.
+
+    """
+
     latents: Tensor
     latents_pre_activation: Tensor
     reconstructed_input: Tensor
+    norm: NormalizationParams
 
 
 class SparseAE(Module):
@@ -52,24 +64,19 @@ class SparseAE(Module):
         self.epsilon = epsilon
         self.tied_bias = nn.Parameter(torch.zeros(self.input_dim))
         self.normalization = LayerNorm(eps=self.epsilon)
-        self.encoder = nn.Linear(
+        self.lin_encoder = nn.Linear(
             in_features=self.input_dim,
             out_features=self.latent_dim,
             bias=False,
         )
-        self.decode = nn.Linear(
+        self.lin_decoder = nn.Linear(
             in_features=self.latent_dim,
             out_features=self.input_dim,
             bias=False,
         )
 
         # Tied weights
-        self.decode.weight.data = self.encoder.weight.data.T.clone()
-
-    def preprocessing(self, x: Tensor) -> tuple[Tensor, NormalizationParams]:
-        """Normalize the input tensor and return normalization parameters."""
-        x, params = self.normalization(x)
-        return x, params
+        self.lin_decoder.weight.data = self.lin_encoder.weight.data.T.clone()
 
     def encoder_pre_activation(self, x: Tensor) -> Tensor:
         """Compute the pre-activation output of the encoder.
@@ -84,7 +91,7 @@ class SparseAE(Module):
 
         """
         x = x - self.tied_bias
-        z = self.encoder(x)
+        z = self.lin_encoder(x)
         return z
 
     def decoder(self, z: Tensor, norm: NormalizationParams) -> Tensor:
@@ -105,7 +112,7 @@ class SparseAE(Module):
             Tensor: The reconstructed input tensor after decoding and denormalization.
 
         """
-        x_rec = self.decode(z) + self.tied_bias
+        x_rec = self.lin_decoder(z) + self.tied_bias
         x_rec = x_rec * (norm.std + self.epsilon) + norm.mu
         return x_rec
 
@@ -121,12 +128,15 @@ class SparseAE(Module):
 
         Returns:
             SAEResult: NamedTuple containing:
-                - latents: Activated latent representation.
-                - latents_pre_activation: Latent representation before activation.
-                - reconstructed_input: Reconstructed input tensor.
+                - latents (Tensor): Activated latent representation.
+                - latents_pre_activation (Tensor): Latent representation before
+                    activation.
+                - reconstructed_input (Tensor): Reconstructed input tensor.
+                - norm (NormalizationParams): Normalization parameters used during
+                    processing.
 
         """
-        x, norm = self.preprocessing(x)
+        x, norm = self.normalization(x)
         z_pre_activation = self.encoder_pre_activation(x)
         z = self.activation(z_pre_activation)
         x_reconstructed = self.decoder(z, norm)
@@ -135,4 +145,5 @@ class SparseAE(Module):
             latents=z,
             latents_pre_activation=z_pre_activation,
             reconstructed_input=x_reconstructed,
+            norm=norm,
         )
