@@ -227,3 +227,7 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,python
 
+train_sae.py
+main.py
+hooking.py
+config.json
