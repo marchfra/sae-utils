@@ -15,7 +15,7 @@ def loss_k_aux(
     sae_output: SAEResult,
     dead_neurons_mask: Tensor,
     k_aux: int = 512,
-) -> Tensor:
+) -> Tensor:  # pragma: no cover[taken-from-trusted-source]
     """Compute the auxiliary k-sparse loss for a sparse autoencoder.
 
     This loss measures the mean squared error (MSE) between the reconstruction error and
@@ -34,6 +34,8 @@ def loss_k_aux(
             - latents (Tensor): The post-activation latent tensor.
             - latents_pre_activation (Tensor): The pre-activation latent tensor.
             - reconstructed_input (Tensor): The reconstructed input tensor.
+            - norm (NormalizationParams): Normalization parameters used during
+                processing.
         dead_neurons_mask (Tensor): A mask tensor indicating inactive (dead) neurons. A
             value of 1 indicates a dead neuron, and 0 indicates an active neuron.
         k_aux (int, optional): Number of top activations to use for the auxiliary loss.
@@ -46,7 +48,7 @@ def loss_k_aux(
     e = x - sae_output.reconstructed_input
     topk_aux = TopKActivation(k=k_aux)
     dead_pre_activations = sae_output.latents_pre_activation * dead_neurons_mask
-    e_hat = autoencoder.decode(topk_aux(dead_pre_activations))
+    e_hat = autoencoder.decoder(topk_aux(dead_pre_activations), sae_output.norm)
     return mse_loss(e, e_hat, reduction="mean").nan_to_num(0)
 
 
@@ -54,7 +56,7 @@ def loss_top_k(
     loss_reconstruction: Tensor,
     loss_aux: Tensor,
     alpha_aux: float,
-) -> Tensor:
+) -> Tensor:  # pragma: no cover[simple-function]
     """Compute the combined loss for top-k selection by summing recon and aux losses.
 
     Args:
