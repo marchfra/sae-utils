@@ -5,8 +5,8 @@ description = "Utilities to train Sparse AutoEncoders"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
-    { name = "Francesco Marchisotti", email = "francesco.marchisotti@gmail.com" },
     { name = "Francesco Cozzi" },
+    { name = "Francesco Marchisotti", email = "francesco.marchisotti@gmail.com" },
 ]
 requires-python = ">=3.11"
 dependencies = [
