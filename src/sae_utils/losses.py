@@ -1,20 +1,23 @@
+from typing import Literal
+
 import torch
 from torch import Tensor
 from torch.nn import DataParallel
 from torch.nn.functional import mse_loss
 
-from sae_utils.activations import TopKActivation
+from sae_utils.activations import AbsTopKActivation, TopKActivation
 from sae_utils.model import SAEResult, SparseAE
 
 loss_reconstruction_fn = mse_loss
 
 
-def loss_k_aux(
+def loss_k_aux(  # noqa: PLR0913
     autoencoder: SparseAE | DataParallel[SparseAE],
     x: Tensor,
     sae_output: SAEResult,
     dead_neurons_mask: Tensor,
     k_aux: int = 512,
+    activation: Literal["topk", "abstopk"] = "topk",
 ) -> Tensor:  # pragma: no cover[taken-from-trusted-source]
     """Compute the auxiliary k-sparse loss for a sparse autoencoder.
 
@@ -40,13 +43,27 @@ def loss_k_aux(
             value of 1 indicates a dead neuron, and 0 indicates an active neuron.
         k_aux (int, optional): Number of top activations to use for the auxiliary loss.
             Defaults to 512.
+        activation (Literal["topk", "abstopk"], optional): Type of top-k activation to
+            use. "topk" selects the k largest activations, while "abstopk" selects the k
+            activations with the largest absolute values. Defaults to "topk".
 
     Returns:
         Tensor: The computed auxiliary k-sparse loss (MSE), with NaNs replaced by zero.
 
+    Raises:
+        ValueError: If the specified loss type is not "topk" or "abstopk".
+
     """
+    if activation == "topk":
+        topk_aux = TopKActivation(k=k_aux)
+    elif activation == "abstopk":
+        topk_aux = AbsTopKActivation(k=k_aux)
+    else:
+        raise ValueError(
+            f"Invalid activation type: {activation}. Choose 'topk' or 'abstopk'.",
+        )
+
     e = x - sae_output.reconstructed_input
-    topk_aux = TopKActivation(k=k_aux)
     dead_pre_activations = sae_output.latents_pre_activation * dead_neurons_mask
     e_hat = autoencoder.decoder(topk_aux(dead_pre_activations), sae_output.norm)
     return mse_loss(e, e_hat, reduction="mean").nan_to_num(0)
