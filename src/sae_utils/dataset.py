@@ -27,14 +27,13 @@ def tied_bias_initialization(
     """Init a tied bias tensor using the geometric median of a subset of the dataset.
 
     Args:
-        dataset (SAETrainingDataset): The training dataset containing input tensors.
-        sample_every (int, optional): Interval for sampling the dataset to compute the
+        dataset: The training dataset containing input tensors.
+        sample_every: Interval for sampling the dataset to compute the
             geometric median. Only every `sample_every`-th sample is used to reduce
             memory usage. Defaults to 15.
 
     Returns:
-        Tensor: The geometric median tensor, moved to CUDA if available and cast to
-            float32.
+        The geometric median tensor, moved to CUDA if available and cast to float32.
 
     """
     subset = Subset(dataset, indices=range(0, len(dataset), sample_every))

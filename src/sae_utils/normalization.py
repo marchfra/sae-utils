@@ -8,8 +8,8 @@ class NormalizationParams(NamedTuple):
     """A NamedTuple that stores normalization parameters for data preprocessing.
 
     Attributes:
-        mu (Tensor): The mean values used for normalization.
-        std (Tensor): The standard deviation values used for normalization.
+        mu: The mean values used for normalization.
+        std: The standard deviation values used for normalization.
 
     """
 
@@ -22,8 +22,8 @@ class LayerNorm(Module):
         """Initialize the object with a specified epsilon value.
 
         Args:
-            eps (float, optional): A small value to avoid division by zero or for
-                numerical stability. Defaults to 1e-5.
+            eps: A small value to avoid division by zero or for numerical stability.
+                Defaults to 1e-5.
 
         """
         super().__init__()
@@ -33,14 +33,12 @@ class LayerNorm(Module):
         """Normalize the input tensor `x` along its last dimension.
 
         Args:
-            x (Tensor): Input tensor to be normalized.
+            x: Input tensor to be normalized.
 
         Returns:
-            tuple[Tensor, Tensor, Tensor]: A tuple containing:
-                - The normalized tensor.
-                - The mean of `x` along the last dimension (with keepdim=True).
-                - The standard deviation of `x` along the last dimension (with
-                    keepdim=True).
+            A tuple (normalized_tensor, norm_params), where `normalized_tensor` is the
+                normalized version of `x`, and `norm_params` is a NamedTuple containing
+                the mean and standard deviation of `x` along the last dimension.
 
         """
         mu = x.mean(dim=-1, keepdim=True)

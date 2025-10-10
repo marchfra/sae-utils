@@ -24,11 +24,11 @@ def validate_device(device: Literal["cpu", "cuda"]) -> Literal["cpu", "cuda"]:
     """Validate the specified device for training.
 
     Args:
-        device (Literal["cpu", "cuda"]): The device to validate.
+        device: The device to validate.
 
     Returns:
-        Literal["cpu", "cuda"]: The validated device. Defaults to "cpu" if the
-            specified device is not available.
+        The validated device. Defaults to "cpu" if the specified device is not
+            available.
 
     Raises:
         ValueError: If an invalid device is specified.
@@ -59,17 +59,13 @@ def train_sae(
     """Train a Sparse Autoencoder (SAE) model on the provided dataset.
 
     Args:
-        config (Config): Configuration object containing training and model
-            hyperparameters.
-        dataset (SAETrainingDataset): Input activations dataset.
-        device (Literal["cpu", "cuda"], optional): Device to run training on. Defaults
-            to "cuda".
+        config: Configuration object containing training and model hyperparameters.
+        dataset: Input activations dataset.
+        device: Device to run training on. Defaults to "cuda".
 
     Returns:
-        tuple:
-            - SparseAE or DataParallel[SparseAE]: The trained Sparse Autoencoder model.
-            - list[float]: List of loss values recorded at the end of each epoch.
-            - list[float]: List of loss values recorded at each batch.
+        A tuple (trained_sae, epoch_losses, batch_losses) where batch_losses is a list
+            of losses recorded at each batch since the beginning of training.
 
     """
     match config.activation:

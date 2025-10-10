@@ -29,26 +29,22 @@ def loss_k_aux(  # noqa: PLR0913
     Sections 2.4 and A.2.
 
     Args:
-        autoencoder (SparseAE | DataParallel[SparseAE]): The sparse autoencoder model
-            with a decode method.
-        x (Tensor): The original input tensor.
-        sae_output (SAEResult): The output of the autoencoder's forward pass,
-            containing:
-            - latents (Tensor): The post-activation latent tensor.
-            - latents_pre_activation (Tensor): The pre-activation latent tensor.
-            - reconstructed_input (Tensor): The reconstructed input tensor.
-            - norm (NormalizationParams): Normalization parameters used during
-                processing.
-        dead_neurons_mask (Tensor): A mask tensor indicating inactive (dead) neurons. A
-            value of 1 indicates a dead neuron, and 0 indicates an active neuron.
-        k_aux (int, optional): Number of top activations to use for the auxiliary loss.
-            Defaults to 512.
-        activation (Literal["topk", "abstopk"], optional): Type of top-k activation to
-            use. "topk" selects the k largest activations, while "abstopk" selects the k
-            activations with the largest absolute values. Defaults to "topk".
+        autoencoder: The sparse autoencoder model with a decode method.
+        x: The original input tensor.
+        sae_output: The output of the autoencoder's forward pass, containing:
+            - latents: The post-activation latent tensor.
+            - latents_pre_activation: The pre-activation latent tensor.
+            - reconstructed_input: The reconstructed input tensor.
+            - norm: Normalization parameters used during processing.
+        dead_neurons_mask: A mask tensor indicating inactive (dead) neurons. A value of
+            1 indicates a dead neuron, and 0 indicates an active neuron.
+        k_aux: Number of top activations to use for the auxiliary loss. Defaults to 512.
+        activation: Type of top-k activation to use. "topk" selects the k largest
+            activations, while "abstopk" selects the k activations with the largest
+            absolute values. Defaults to "topk".
 
     Returns:
-        Tensor: The computed auxiliary k-sparse loss (MSE), with NaNs replaced by zero.
+        The computed auxiliary k-sparse loss (MSE), with NaNs replaced by zero.
 
     Raises:
         ValueError: If the specified loss type is not "topk" or "abstopk".
@@ -77,12 +73,12 @@ def loss_top_k(
     """Compute the combined loss for top-k selection by summing recon and aux losses.
 
     Args:
-        loss_reconstruction (Tensor): The reconstruction loss tensor.
-        loss_aux (Tensor): The auxiliary loss tensor.
-        alpha_aux (float): Weighting factor for the auxiliary loss.
+        loss_reconstruction: The reconstruction loss tensor.
+        loss_aux: The auxiliary loss tensor.
+        alpha_aux: Weighting factor for the auxiliary loss.
 
     Returns:
-        Tensor: The combined loss as a float32 tensor.
+        The combined loss as a float32 tensor.
 
     """
     loss = loss_reconstruction + alpha_aux * loss_aux

@@ -9,7 +9,7 @@ class TopKActivation(Module):
         """Initialize the TopKActivation module.
 
         Args:
-            k (int): The number of top activations to keep.
+            k: The number of top activations to keep.
 
         """
         super().__init__()
@@ -24,11 +24,11 @@ class TopKActivation(Module):
         are set to zero.
 
         Args:
-            z (Tensor): Input tensor of arbitrary shape.
+            z: Input tensor of arbitrary shape.
 
         Returns:
-            Tensor: Output tensor of the same shape as `z`, with only the top-k values
-                retained along the last dimension and all other elements set to zero.
+            Output tensor of the same shape as `z`, with only the top-k values retained
+                along the last dimension and all other elements set to zero.
 
         Raises:
             ValueError: If `k` is greater than the size of the last dimension of `z`.
@@ -66,12 +66,11 @@ class AbsTopKActivation(TopKActivation):
         values is preserved.
 
         Args:
-            z (Tensor): Input tensor of arbitrary shape.
+            z: Input tensor of arbitrary shape.
 
         Returns:
-            Tensor: Output tensor of the same shape as `z`, with only the top-k absolute
-                values retained along the last dimension and all other elements set to
-                zero.
+            Output tensor of the same shape as `z`, with only the top-k absolute values
+                retained along the last dimension and all other elements set to zero.
 
         Raises:
             ValueError: If `k` is greater than the size of the last dimension of `z`.
@@ -98,12 +97,12 @@ def update_dead_neuron_counts(z: Tensor, prev_counts: Tensor) -> Tensor:
     current batch, and resets the count to zero for neurons that are active.
 
     Args:
-        z (Tensor): The activation tensor of shape (batch_size, num_neurons).
-        prev_counts (Tensor): The tensor containing previous dead neuron counts for each
+        z: The activation tensor of shape (batch_size, num_neurons).
+        prev_counts: The tensor containing previous dead neuron counts for each
             neuron.
 
     Returns:
-        Tensor: Updated dead neuron counts for each neuron.
+        Updated dead neuron counts for each neuron.
 
     """
     # ! Right now this function increments the count for dead neurons and keeps the
