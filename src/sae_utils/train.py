@@ -92,9 +92,7 @@ def train_sae(
     )
     if device == "cuda" and torch.cuda.device_count() > 1:
         autoencoder = DataParallel(autoencoder)
-    autoencoder.tied_bias.data = tied_bias_initialization(
-        dataset,
-    )  # DataParallel has no attribute 'tied_bias'
+    autoencoder.init_tied_bias(tied_bias=tied_bias_initialization(dataset))
     autoencoder.to(device)
 
     print(f"Dataset shape: {dataset.data.shape}")

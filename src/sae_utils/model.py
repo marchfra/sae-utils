@@ -35,8 +35,6 @@ class SparseAE(Module):
 
     # TODO: right now TopKActivation is not the default
 
-    tied_bias: Tensor
-
     def __init__(
         self,
         input_dim: int,
@@ -78,6 +76,21 @@ class SparseAE(Module):
         # Tied weights
         self.lin_decoder.weight.data = self.lin_encoder.weight.data.T.clone()
 
+    def init_tied_bias(self, tied_bias: Tensor) -> None:
+        """Initialize the tied bias parameter.
+
+        Args:
+            tied_bias: Tensor to initialize the tied bias.
+
+        """
+        if tied_bias.shape != (self.input_dim,):
+            raise ValueError(
+                f"tied_bias must have shape ({self.input_dim},), "
+                f"but got {tied_bias.shape}",
+            )
+
+        self.tied_bias.data = tied_bias
+
     def encoder_pre_activation(self, x: Tensor) -> Tensor:
         """Compute the pre-activation output of the encoder.
 
@@ -90,6 +103,13 @@ class SparseAE(Module):
             The encoder's pre-activation output.
 
         """
+        try:
+            _ = self.tied_bias
+        except AttributeError as e:
+            raise AttributeError(
+                "tied_bias is not initialized. Call init_tied_bias() first.",
+            ) from e
+
         x = x - self.tied_bias
         z = self.lin_encoder(x)
         return z
