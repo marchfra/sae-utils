@@ -73,6 +73,7 @@ def train_sae(
             activation = ReLU()
 
     device = validate_device(device)
+    multiple_gpus = device == "cuda" and torch.cuda.device_count() > 1
 
     print("Starting SAE training")
     print(f"Using activation function: {activation}")
@@ -84,13 +85,15 @@ def train_sae(
     print(f"Learning rate: {config.learning_rate}")
     print(f"Number of epochs: {config.n_epochs}")
     print(f"Device: {device}")
+    if multiple_gpus:
+        print(f"Number of GPUs: {torch.cuda.device_count()}. Using DataParallel.")
 
     autoencoder = SparseAE(
         input_dim=dataset.data.shape[-1],
         latent_dim_factor=config.latent_dim_factor,
         activation=activation,
     )
-    if device == "cuda" and torch.cuda.device_count() > 1:
+    if multiple_gpus:
         autoencoder = DataParallel(autoencoder)
         autoencoder.module.tied_bias.data = tied_bias_initialization(dataset)
     else:
@@ -105,7 +108,10 @@ def train_sae(
 
     epoch_losses: list[float] = []
     batch_losses: list[float] = []
-    dead_neurons_counts = torch.zeros(autoencoder.latent_dim).to(device)
+    if multiple_gpus:
+        dead_neurons_counts = torch.zeros(autoencoder.module.latent_dim).to(device)
+    else:
+        dead_neurons_counts = torch.zeros(autoencoder.latent_dim).to(device)
     for _epochs in trange(config.n_epochs, desc="SAE training epoch"):
         for batch in tqdm(dataloader, desc="SAE training batch", leave=False):
             optimizer.zero_grad()
