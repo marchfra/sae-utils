@@ -61,7 +61,13 @@ def loss_k_aux(  # noqa: PLR0913
 
     e = x - sae_output.reconstructed_input
     dead_pre_activations = sae_output.latents_pre_activation * dead_neurons_mask
-    e_hat = autoencoder.decoder(topk_aux(dead_pre_activations), sae_output.norm)
+    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+        e_hat = autoencoder.module.decoder(
+            topk_aux(dead_pre_activations),
+            sae_output.norm,
+        )
+    else:
+        e_hat = autoencoder.decoder(topk_aux(dead_pre_activations), sae_output.norm)
     return mse_loss(e, e_hat, reduction="mean").nan_to_num(0)
 
 

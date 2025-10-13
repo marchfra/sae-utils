@@ -20,7 +20,7 @@ class SAETrainingDataset(Dataset[Tensor]):
         return self.data[idx]
 
 
-def tied_bias_initialization(
+def compute_tied_bias(
     dataset: SAETrainingDataset,
     sample_every: int = 15,
 ) -> Tensor:

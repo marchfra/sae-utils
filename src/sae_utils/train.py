@@ -11,7 +11,7 @@ from sae_utils.activations import (
     update_dead_neuron_counts,
 )
 from sae_utils.config import Config
-from sae_utils.dataset import SAETrainingDataset, tied_bias_initialization
+from sae_utils.dataset import SAETrainingDataset, compute_tied_bias
 from sae_utils.losses import loss_k_aux, loss_reconstruction_fn, loss_top_k
 from sae_utils.model import SparseAE
 
@@ -95,9 +95,9 @@ def train_sae(
     )
     if multiple_gpus:
         autoencoder = DataParallel(autoencoder)
-        autoencoder.module.tied_bias.data = tied_bias_initialization(dataset)
+        autoencoder.module.tied_bias.data = compute_tied_bias(dataset)
     else:
-        autoencoder.tied_bias.data = tied_bias_initialization(dataset)
+        autoencoder.tied_bias.data = compute_tied_bias(dataset)
     autoencoder.to(device)
 
     print(f"Dataset shape: {dataset.data.shape}")

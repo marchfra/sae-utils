@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from sae_utils.dataset import SAETrainingDataset, tied_bias_initialization
+from sae_utils.dataset import SAETrainingDataset, compute_tied_bias
 
 
 def test_sae_training_dataset_init_with_tensor() -> None:
@@ -74,7 +74,7 @@ def test_tied_bias_initialization_returns_geometric_median() -> None:
     )
     dataset = SAETrainingDataset(data)
 
-    result = tied_bias_initialization(dataset, sample_every=5)
+    result = compute_tied_bias(dataset, sample_every=5)
     assert torch.allclose(result.cpu(), 5 * torch.ones(8), atol=1e-4)
     assert result.dtype == torch.float32
 
@@ -95,5 +95,5 @@ def test_tied_bias_initialization_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(torch.Tensor, "cuda", lambda self: self)
 
-    result = tied_bias_initialization(dataset)
+    result = compute_tied_bias(dataset)
     assert torch.allclose(result.cpu(), expected_median.float())
