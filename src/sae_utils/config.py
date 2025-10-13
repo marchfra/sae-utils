@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -34,4 +34,4 @@ class Config:
     def save_to_json(self, json_file: Path) -> None:
         """Save Config instance to a JSON file."""
         with json_file.open("w") as f:
-            json.dump(self.__dict__, f, indent=2)
+            json.dump(asdict(self), f, indent=2)
