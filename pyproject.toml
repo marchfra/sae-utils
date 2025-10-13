@@ -1,5 +1,5 @@
 [project]
-name = "sae-utils"
+name = "sae_utils"
 version = "0.0.2.dev2"
 description = "Utilities to train Sparse AutoEncoders"
 readme = "README.md"
