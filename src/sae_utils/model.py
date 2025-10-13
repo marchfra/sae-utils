@@ -35,6 +35,8 @@ class SparseAE(Module):
 
     # TODO: right now TopKActivation is not the default
 
+    tied_bias: Tensor
+
     def __init__(
         self,
         input_dim: int,

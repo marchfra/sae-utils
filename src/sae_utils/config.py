@@ -14,7 +14,7 @@ class Config:
     latent_dim_factor: int
     k: int
     threshold_dead_latent: int
-    alpha_aux_loss: float
+    alpha_aux_loss: float = 1 / 32  # In accordance with OpenAI's paper
     activation: Literal["topk"] = "topk"
     k_aux: int = 256
 
