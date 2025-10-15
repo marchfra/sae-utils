@@ -85,8 +85,6 @@ def train_sae(
     print(f"Learning rate: {config.learning_rate}")
     print(f"Number of epochs: {config.n_epochs}")
     print(f"Device: {device}")
-    if multiple_gpus:
-        print(f"Number of GPUs: {torch.cuda.device_count()}. Using DataParallel.")
 
     autoencoder = SparseAE(
         input_dim=dataset.data.shape[-1],
@@ -137,6 +135,7 @@ def train_sae(
                 sae_output=result,
                 dead_neurons_mask=dead_neurons_mask,
                 k_aux=config.k_aux,
+                activation=config.activation,
             )
             batch_loss = loss_top_k(
                 loss_reconstruction=loss_reconstruction,
