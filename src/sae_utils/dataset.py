@@ -37,7 +37,19 @@ def compute_tied_bias(
 
     """
     subset = Subset(dataset, indices=range(0, len(dataset), sample_every))
-    geom_med: Tensor = compute_geometric_median(subset[0:]).median  # type: ignore[SAEDataset has a data attribute]
+    last_dim = subset[:].shape[-1]
+    geom_med: Tensor = compute_geometric_median(subset[:].reshape(-1, last_dim)).median
     if torch.cuda.is_available():
-        return geom_med.cuda().to(torch.float32)
+        geom_med = geom_med.cuda()
     return geom_med.to(torch.float32)
+
+
+if __name__ == "__main__":
+    dataset = SAEDataset(torch.randn(100, 5))
+    subset = Subset(dataset, indices=range(0, len(dataset), 9))
+    print("Dataset samples:", dataset.data.shape)
+    print("Subset samples:", subset[:].shape)
+
+    last_dim = subset[:].shape[-1]
+    median = compute_geometric_median(subset[:].reshape(-1, last_dim)).median
+    print("Geometric median shape:", median.shape)
