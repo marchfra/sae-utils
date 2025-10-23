@@ -15,7 +15,7 @@ class Config:
     k: int
     threshold_dead_latent: int
     alpha_aux_loss: float = 1 / 32  # In accordance with OpenAI's paper
-    activation: Literal["topk", "abstopk"] = "topk"
+    activation: Literal["topk"] = "topk"
     k_aux: int = 512  # In accordance with OpenAI's paper
 
     @classmethod

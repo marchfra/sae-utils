@@ -4,7 +4,8 @@ import torch
 from torch import Tensor, nn
 from torch.nn import Module
 
-from sae_utils.normalization import LayerNorm, NormalizationParams
+from sae_utils.activations import TopK
+from sae_utils.normalization import LayerNorm, NormParams
 
 
 class SAEResult(NamedTuple):
@@ -20,8 +21,8 @@ class SAEResult(NamedTuple):
 
     latents: Tensor
     latents_pre_activation: Tensor
-    reconstructed_input: Tensor
-    norm: NormalizationParams
+    recon: Tensor
+    norm: NormParams
 
 
 class SparseAE(Module):
@@ -33,13 +34,11 @@ class SparseAE(Module):
 
     """
 
-    # TODO: right now TopKActivation is not the default
-
     def __init__(
         self,
         input_dim: int,
         latent_dim_factor: int,
-        activation: Module,
+        activation: TopK,
         epsilon: float = 1e-7,
     ) -> None:
         """Initialize the SparseAE (Sparse AutoEncoder) module.
@@ -57,16 +56,15 @@ class SparseAE(Module):
         self.input_dim = input_dim
         self.latent_dim_factor = latent_dim_factor
         self.latent_dim = self.input_dim * self.latent_dim_factor
-        self.activation = activation
 
-        self.epsilon = epsilon
         self.tied_bias = nn.Parameter(torch.zeros(self.input_dim))
-        self.normalization = LayerNorm(eps=self.epsilon)
+        self.normalization = LayerNorm(eps=epsilon)
         self.lin_encoder = nn.Linear(
             in_features=self.input_dim,
             out_features=self.latent_dim,
             bias=False,
         )
+        self.activation = nn.Sequential(activation, nn.ReLU())
         self.lin_decoder = nn.Linear(
             in_features=self.latent_dim,
             out_features=self.input_dim,
@@ -91,7 +89,7 @@ class SparseAE(Module):
 
         self.tied_bias.data = tied_bias
 
-    def encoder_pre_activation(self, x: Tensor) -> Tensor:
+    def encode_pre_activation(self, x: Tensor) -> Tensor:
         """Compute the pre-activation output of the encoder.
 
         Before encoding, the tied bias is subtracted from the input tensor.
@@ -114,7 +112,7 @@ class SparseAE(Module):
         z = self.lin_encoder(x)
         return z
 
-    def decoder(self, z: Tensor, norm: NormalizationParams) -> Tensor:
+    def decode(self, z: Tensor, norm: NormParams) -> Tensor:
         """Decode the latent representation `z` into the reconstructed input tensor.
 
         The decoding process involves:
@@ -131,7 +129,7 @@ class SparseAE(Module):
 
         """
         x_rec = self.lin_decoder(z) + self.tied_bias
-        x_rec = x_rec * (norm.std + self.epsilon) + norm.mu
+        x_rec = x_rec * (norm.std + norm.eps) + norm.mu
         return x_rec
 
     def forward(self, x: Tensor) -> SAEResult:
@@ -145,21 +143,21 @@ class SparseAE(Module):
             x: Input tensor to be processed.
 
         Returns:
-            A NamedTuple (`latents`, `latents_pre_activation`, `reconstructed_input`,
-                `norm`), where `latents` is the activated latent representation,
-                `latents_pre_activation` is the latent representation before activation,
-                `reconstructed_input` is the reconstructed input tensor, and `norm` is
-                the normalization parameters used during processing.
+            A NamedTuple (`latents`, `latents_pre_activation`, `recon`, `norm`), where
+            `latents` is the activated latent representation, `latents_pre_activation`
+            is the latent representation before activation, `recon` is the reconstructed
+            input tensor, and `norm` is the normalization parameters used during
+            processing.
 
         """
         x, norm = self.normalization(x)
-        z_pre_activation = self.encoder_pre_activation(x)
+        z_pre_activation = self.encode_pre_activation(x)
         z = self.activation(z_pre_activation)
-        x_reconstructed = self.decoder(z, norm)
+        x_reconstructed = self.decode(z, norm)
 
         return SAEResult(
             latents=z,
             latents_pre_activation=z_pre_activation,
-            reconstructed_input=x_reconstructed,
+            recon=x_reconstructed,
             norm=norm,
         )

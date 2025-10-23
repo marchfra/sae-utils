@@ -4,17 +4,19 @@ from torch import Tensor
 from torch.nn import Module
 
 
-class NormalizationParams(NamedTuple):
+class NormParams(NamedTuple):
     """A NamedTuple that stores normalization parameters for data preprocessing.
 
     Attributes:
         mu: The mean values used for normalization.
         std: The standard deviation values used for normalization.
+        eps: A small value to avoid division by zero.
 
     """
 
     mu: Tensor
     std: Tensor
+    eps: float
 
 
 class LayerNorm(Module):
@@ -22,14 +24,13 @@ class LayerNorm(Module):
         """Initialize the object with a specified epsilon value.
 
         Args:
-            eps: A small value to avoid division by zero or for numerical stability.
-                Defaults to 1e-5.
+            eps: A small value to avoid division by zero. Defaults to 1e-5.
 
         """
         super().__init__()
         self.eps = eps
 
-    def forward(self, x: Tensor) -> tuple[Tensor, NormalizationParams]:
+    def forward(self, x: Tensor) -> tuple[Tensor, NormParams]:
         """Normalize the input tensor `x` along its last dimension.
 
         Args:
@@ -45,4 +46,4 @@ class LayerNorm(Module):
         x = x - mu
         std = x.std(dim=-1, keepdim=True)
         x = x / (std + self.eps)
-        return x, NormalizationParams(mu, std)
+        return x, NormParams(mu, std, self.eps)

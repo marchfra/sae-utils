@@ -1,152 +1,189 @@
-from typing import Literal
+from typing import Literal, NamedTuple
 
 import torch
-from torch.nn import DataParallel, ReLU
 from torch.utils.data import DataLoader
-from tqdm.autonotebook import tqdm, trange
+from tqdm.auto import trange
 
-from sae_utils.activations import (
-    AbsTopKActivation,
-    TopKActivation,
-    update_dead_neuron_counts,
-)
+from sae_utils.activations import TopK, update_dead_latent_counts
 from sae_utils.config import Config
-from sae_utils.dataset import SAETrainingDataset, compute_tied_bias
-from sae_utils.losses import loss_k_aux, loss_reconstruction_fn, loss_top_k
+from sae_utils.dataset import SAEDataset, compute_tied_bias
+from sae_utils.losses import loss_k_aux, loss_recon_fn, loss_top_k
 from sae_utils.model import SparseAE
 
 
-def validate_device(device: Literal["cpu", "cuda"]) -> Literal["cpu", "cuda"]:
-    """Validate the specified device for training.
+class _SAETrainingOutput(NamedTuple):
+    """Named tuple describing the outputs of a Sparse Autoencoder training run.
 
-    Args:
-        device: The device to validate.
-
-    Returns:
-        The validated device. Defaults to "cpu" if the specified device is not
-            available.
-
-    Raises:
-        ValueError: If an invalid device is specified.
+    Attributes
+    ----------
+    sae : SparseAE
+        The trained Sparse Autoencoder instance returned after training.
+    epoch_train_losses : list[float]
+        Training loss recorded at the end of each epoch.
+    batch_train_losses : list[float]
+        Training loss recorded for each batch across all epochs.
+    epoch_val_losses : list[float]
+        Validation loss recorded at the end of each epoch.
+    best_epoch : int
+        Index (0-based) of the epoch with the lowest validation loss.
 
     """
-    if device not in ["cpu", "cuda"]:
-        raise ValueError(f"Invalid device specified: {device}. Choose 'cpu' or 'cuda'.")
 
-    if device == "cuda":
-        if torch.cuda.is_available():
-            print("CUDA is available. Using GPU for training.")
-            if torch.cuda.device_count() > 1:
-                print(f"Using all {torch.cuda.device_count()} GPUs for training.")
-            return "cuda"
-
-        print("CUDA is not available. Using CPU for training.")
-        return "cpu"
-
-    print("Using CPU for training.")
-    return "cpu"
+    sae: SparseAE
+    epoch_train_losses: list[float]
+    batch_train_losses: list[float]
+    epoch_val_losses: list[float]
+    best_epoch: int
 
 
 def train_sae(
     config: Config,
-    dataset: SAETrainingDataset,
+    train_set: SAEDataset,
+    val_set: SAEDataset,
     device: Literal["cpu", "cuda"] = "cuda",
-) -> tuple[SparseAE | DataParallel[SparseAE], list[float], list[float]]:
+) -> _SAETrainingOutput:
     """Train a Sparse Autoencoder (SAE) model on the provided dataset.
+
+    After each epoch, the model is evaluated on the validation set. The model with the
+    lowest validation loss at the end of training is returned.
 
     Args:
         config: Configuration object containing training and model hyperparameters.
-        dataset: Input activations dataset.
+        train_set: Input activations dataset.
+        val_set: Validation dataset.
         device: Device to run training on. Defaults to "cuda".
 
     Returns:
-        A tuple (trained_sae, epoch_losses, batch_losses) where batch_losses is a list
-            of losses recorded at each batch since the beginning of training.
+        A _SAETrainingOutput named tuple containing the best trained SAE model, training
+        losses per epoch, training losses per batch, validation losses per epoch, and
+        the epoch number with the best validation loss.
 
     """
-    match config.activation:
-        case "topk":
-            activation = TopKActivation(k=config.k)
-        case "abstopk":
-            activation = AbsTopKActivation(k=config.k)
-        case _:
-            activation = ReLU()
-
-    device = validate_device(device)
-    multiple_gpus = device == "cuda" and torch.cuda.device_count() > 1
+    activation = TopK(k=config.k)
 
     print("Starting SAE training")
     print(f"Using activation function: {activation}")
-    print(f"Input dimension: {dataset.data.shape[-1]}")
+    print(f"Input shape: {train_set.data.shape}")
     print(
-        f"Latent dimension factor: {config.latent_dim_factor} | "
-        f"Latent dimension: {dataset.data.shape[-1] * config.latent_dim_factor}",
+        f"Latent dimension factor: {config.latent_dim_factor} "
+        f"| Latent shape: {(*train_set.data.shape[:-1], train_set.data.shape[-1] * config.latent_dim_factor)}",
     )
-    print(f"Learning rate: {config.learning_rate}")
     print(f"Number of epochs: {config.n_epochs}")
+    print(f"Learning rate: {config.learning_rate}")
     print(f"Device: {device}")
 
-    autoencoder = SparseAE(
-        input_dim=dataset.data.shape[-1],
+    train_loader = DataLoader(
+        dataset=train_set,
+        batch_size=config.batch_size,
+        shuffle=True,
+    )
+    print(
+        f"Dataloader created with batch size: {config.batch_size} "
+        f"| Number of batches: {len(train_loader)}",
+    )
+    val_loader = DataLoader(
+        dataset=val_set,
+        batch_size=config.batch_size,
+        shuffle=False,
+    )
+
+    sae = SparseAE(
+        input_dim=train_set.data.shape[-1],
         latent_dim_factor=config.latent_dim_factor,
         activation=activation,
     )
-    if multiple_gpus:
-        autoencoder = DataParallel(autoencoder)
-        autoencoder.module.tied_bias.data = compute_tied_bias(dataset)
-    else:
-        autoencoder.tied_bias.data = compute_tied_bias(dataset)
-    autoencoder.to(device)
+    sae.init_tied_bias(compute_tied_bias(train_set))
+    sae.to(device)
 
-    print(f"Dataset shape: {dataset.data.shape}")
-    optimizer = torch.optim.Adam(autoencoder.parameters(), lr=config.learning_rate)
-    dataloader = DataLoader(dataset=dataset, batch_size=config.batch_size, shuffle=True)
-    print(f"Dataloader created with batch size: {config.batch_size}")
-    print(f"Number of batches: {len(dataloader)}")
+    optimizer = torch.optim.Adam(sae.parameters(), lr=config.learning_rate)
 
-    epoch_losses: list[float] = []
-    batch_losses: list[float] = []
-    if multiple_gpus:
-        dead_neurons_counts = torch.zeros(autoencoder.module.latent_dim).to(device)
-    else:
-        dead_neurons_counts = torch.zeros(autoencoder.latent_dim).to(device)
-    for _epochs in trange(config.n_epochs, desc="SAE training epoch"):
-        for batch in tqdm(dataloader, desc="SAE training batch", leave=False):
+    epoch_train_losses: list[float] = []
+    epoch_val_losses: list[float] = []
+    batch_train_losses: list[float] = []
+    dead_neurons_counts = torch.zeros(sae.latent_dim, dtype=torch.long).to(device)
+    best_val_loss = float("inf")
+    best_sae_state_dict = sae.state_dict()
+    best_epoch = -1
+    for epoch in trange(config.n_epochs, desc="SAE training", unit="epoch"):
+        sae.train()
+        for batch in train_loader:
             optimizer.zero_grad()
 
-            x = batch.to(device=device, dtype=torch.float32)
-            result = autoencoder(x)
+            x = batch.to(device=device)
+            result = sae(x)
 
-            loss_reconstruction = loss_reconstruction_fn(
-                input=result.reconstructed_input,
-                target=x,
-            )
+            loss_recon = loss_recon_fn(input=result.recon, target=x)
 
             # Update dead neurons counts and create mask
-            dead_neurons_counts = update_dead_neuron_counts(
+            dead_neurons_counts = update_dead_latent_counts(
                 z=result.latents.detach(),
                 prev_counts=dead_neurons_counts.clone(),
             )
             dead_neurons_mask = dead_neurons_counts > config.threshold_dead_latent
 
             aux_loss = loss_k_aux(
-                autoencoder=autoencoder,
+                autoencoder=sae,
                 x=x,
                 sae_output=result,
-                dead_neurons_mask=dead_neurons_mask,
+                dead_latents_mask=dead_neurons_mask,
                 k_aux=config.k_aux,
-                activation=config.activation,
             )
             batch_loss = loss_top_k(
-                loss_reconstruction=loss_reconstruction,
+                loss_reconstruction=loss_recon,
                 loss_aux=aux_loss,
                 alpha_aux=config.alpha_aux_loss,
             )
 
-            batch_losses.append(batch_loss.item())
+            batch_train_losses.append(batch_loss.item())
             batch_loss.backward()
             optimizer.step()
 
-        epoch_losses.append(sum(batch_losses) / len(batch_losses))
+        epoch_train_losses.append(sum(batch_train_losses) / len(batch_train_losses))
 
-    return autoencoder, epoch_losses, batch_losses
+        # Validation after each epoch
+        sae.eval()
+        val_losses: list[float] = []
+        with torch.no_grad():
+            for val_batch in val_loader:
+                x_val = val_batch.to(device=device)
+                val_result = sae(x_val)
+
+                val_loss_recon = loss_recon_fn(input=val_result.recon, target=x_val)
+
+                # TODO: Figure out how to handle dead neurons in validation
+                # Create dead latents mask for validation
+                dead_neurons_mask_val = (
+                    dead_neurons_counts > config.threshold_dead_latent
+                )
+
+                val_aux_loss = loss_k_aux(
+                    autoencoder=sae,
+                    x=x_val,
+                    sae_output=val_result,
+                    dead_latents_mask=dead_neurons_mask_val,
+                    k_aux=config.k_aux,
+                )
+                val_batch_loss = loss_top_k(
+                    loss_reconstruction=val_loss_recon,
+                    loss_aux=val_aux_loss,
+                    alpha_aux=config.alpha_aux_loss,
+                )
+                val_losses.append(val_batch_loss.item())
+
+        epoch_val_losses.append(sum(val_losses) / len(val_losses))
+
+        # Save best model based on validation loss
+        if epoch_val_losses[-1] < best_val_loss:
+            best_val_loss = epoch_val_losses[-1]
+            best_sae_state_dict = sae.state_dict()
+            best_epoch = epoch
+
+    sae.load_state_dict(best_sae_state_dict)
+
+    return _SAETrainingOutput(
+        sae,
+        epoch_train_losses,
+        batch_train_losses,
+        epoch_val_losses,
+        best_epoch,
+    )
