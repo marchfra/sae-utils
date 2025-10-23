@@ -113,7 +113,7 @@ def train_sae(  # noqa: PLR0915
         for batch in train_loader:
             optimizer.zero_grad()
 
-            x = batch.to(device=device)
+            x = batch.to(device=device, dtype=torch.float32)
             result = sae(x)
 
             loss_recon = loss_recon_fn(input=result.recon, target=x)
@@ -149,7 +149,7 @@ def train_sae(  # noqa: PLR0915
         val_losses: list[float] = []
         with torch.no_grad():
             for val_batch in val_loader:
-                x_val = val_batch.to(device=device)
+                x_val = val_batch.to(device=device, dtype=torch.float32)
                 val_result = sae(x_val)
 
                 val_loss_recon = loss_recon_fn(input=val_result.recon, target=x_val)

@@ -1,6 +1,6 @@
 [project]
 name = "sae-utils"
-version = "0.0.2.dev3"
+version = "0.0.2.dev4"
 description = "Utilities to train Sparse AutoEncoders"
 readme = "README.md"
 license = { file = "LICENSE" }
