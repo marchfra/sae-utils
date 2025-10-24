@@ -29,7 +29,7 @@ class LayerNorm(Module):
 
         """
         super().__init__()
-        self.eps = torch.tensor(eps, dtype=torch.float32)
+        self.eps = torch.tensor(eps, dtype=torch.float32).to(torch.device("cuda"))
 
     def forward(self, x: Tensor) -> tuple[Tensor, NormParams]:
         """Normalize the input tensor `x` along its last dimension.
