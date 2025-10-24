@@ -1,6 +1,5 @@
 from typing import NamedTuple
 
-import torch
 from torch import Tensor
 from torch.nn import Module
 
@@ -11,13 +10,11 @@ class NormParams(NamedTuple):
     Attributes:
         mu: The mean values used for normalization.
         std: The standard deviation values used for normalization.
-        eps: A small value to avoid division by zero.
 
     """
 
     mu: Tensor
     std: Tensor
-    eps: Tensor
 
 
 class LayerNorm(Module):
@@ -29,7 +26,7 @@ class LayerNorm(Module):
 
         """
         super().__init__()
-        self.eps = torch.tensor(eps, dtype=torch.float32)
+        self.eps = eps
 
     def forward(self, x: Tensor) -> tuple[Tensor, NormParams]:
         """Normalize the input tensor `x` along its last dimension.
@@ -47,4 +44,4 @@ class LayerNorm(Module):
         x = x - mu
         std = x.std(dim=-1, keepdim=True)
         x = x / (std + self.eps)
-        return x, NormParams(mu, std, self.eps)
+        return x, NormParams(mu, std)

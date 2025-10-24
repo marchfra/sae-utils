@@ -199,7 +199,6 @@ def _initialize_sae(
     sae.init_tied_bias(compute_tied_bias(train_set))
     sae = DataParallel(sae)
     sae.to(config.device)
-    sae.normalization.eps = sae.normalization.eps.to(config.device)
     return sae
 
 

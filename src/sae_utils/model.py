@@ -56,6 +56,7 @@ class SparseAE(Module):
         self.input_dim = input_dim
         self.latent_dim_factor = latent_dim_factor
         self.latent_dim = self.input_dim * self.latent_dim_factor
+        self.eps = epsilon
 
         self.tied_bias = nn.Parameter(torch.zeros(self.input_dim))
         self.normalization = LayerNorm(eps=epsilon)
@@ -129,7 +130,7 @@ class SparseAE(Module):
 
         """
         x_rec = self.lin_decoder(z) + self.tied_bias
-        x_rec = x_rec * (norm.std + norm.eps) + norm.mu
+        x_rec = x_rec * (norm.std + self.eps) + norm.mu
         return x_rec
 
     def forward(self, x: Tensor) -> SAEResult:
