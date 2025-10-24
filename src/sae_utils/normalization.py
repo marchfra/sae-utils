@@ -1,6 +1,7 @@
 from typing import NamedTuple
 
-from torch import Tensor, tensor
+import torch
+from torch import Tensor
 from torch.nn import Module
 
 
@@ -28,7 +29,7 @@ class LayerNorm(Module):
 
         """
         super().__init__()
-        self.eps = tensor(eps)
+        self.eps = torch.tensor(eps, dtype=torch.float32)
 
     def forward(self, x: Tensor) -> tuple[Tensor, NormParams]:
         """Normalize the input tensor `x` along its last dimension.
