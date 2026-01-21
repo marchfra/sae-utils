@@ -34,11 +34,12 @@ class TopK(Module):
 
         """
         if self.k > z.shape[-1]:
-            raise ValueError(
+            msg = (
                 f"k cannot be greater than the last dimension of the input tensor. "
                 f"Got k={self.k} and input tensor with last dimension size "
-                f"{z.shape[-1]}",
+                f"{z.shape[-1]}"
             )
+            raise ValueError(msg)
 
         topk_values, topk_indices = torch.topk(z, self.k, dim=-1)
         output = torch.zeros_like(z).scatter_(
@@ -71,7 +72,7 @@ def _all_except_last_dim(tensor: Tensor, *, keepdim: bool = False) -> Tensor:
     return tensor.all(dim=dims_to_reduce, keepdim=keepdim)
 
 
-def update_dead_latent_counts(z: Tensor, prev_counts: Tensor) -> Tensor:
+def update_dead_latent_counts(activations: Tensor, prev_counts: Tensor) -> Tensor:
     """Update the count of dead latents based on the current batch activations.
 
     A latent is considered "dead" in a batch if for every token in the context of each
@@ -82,16 +83,16 @@ def update_dead_latent_counts(z: Tensor, prev_counts: Tensor) -> Tensor:
     Example:
         Given the following latent activations `z` for a batch of 2 samples, each with a
         context length of 3 and 5 latents:
-        >>> z     = [[[0, 0, 0, 0, 5],
-                      [0, 0, 3, 2, 1],
-                      [0, 0, 3, 4, 5]],
-                     [[0, 2, 0, 4, 5],
-                      [0, 4, 3, 2, 1],
-                      [0, 2, 3, 4, 5]]]
-        >>> is_dead = [1, 0, 0, 0, 0]
+        >>> activations = [[[0, 0, 0, 0, 5],
+                            [0, 0, 3, 2, 1],
+                            [0, 0, 3, 4, 5]],
+                           [[0, 2, 0, 4, 5],
+                            [0, 4, 3, 2, 1],
+                            [0, 2, 3, 4, 5]]]
+        >>> is_dead =       [1, 0, 0, 0, 0]
 
     Args:
-        z: The latent activations tensor. (shape [batch_size, context_len,
+        activations: The latent activations tensor. (shape [batch_size, context_len,
             num_latents]).
         prev_counts: The tensor containing previous dead neuron counts for each
             neuron. (shape: [num_latents])
@@ -100,7 +101,8 @@ def update_dead_latent_counts(z: Tensor, prev_counts: Tensor) -> Tensor:
         Updated dead neuron counts for each neuron.
 
     """
-    dead_mask = _all_except_last_dim(z == 0).to(dtype=torch.int)
+    dead_mask = _all_except_last_dim(activations == 0).to(dtype=torch.int)
+    count = prev_counts * dead_mask  # This resets the count if the latent is active
     count = prev_counts + dead_mask
     return count
 
