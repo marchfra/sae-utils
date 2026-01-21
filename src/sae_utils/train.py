@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import torch
 from torch.nn import DataParallel
@@ -42,7 +42,8 @@ def train_sae(
     train_set: SAEDataset,
     val_set: SAEDataset,
     *,
-    verbose: bool = True,
+    # verbose: bool = True,
+    verbose: Literal["print", "tqdm", "telegram"] | None = None,
 ) -> _SAETrainingOutput:
     """Train a Sparse Autoencoder (SAE) model on the provided dataset.
 
@@ -53,7 +54,7 @@ def train_sae(
         config: Configuration object containing training and model hyperparameters.
         train_set: Input activations dataset.
         val_set: Validation dataset.
-        verbose: Whether to print training information. Defaults to True.
+        verbose: Choose if and how to display training progress. Defaults to None.
 
     Returns:
         A _SAETrainingOutput named tuple containing the best trained SAE model, training
@@ -61,6 +62,10 @@ def train_sae(
         the epoch number with the best validation loss.
 
     """
+    if verbose == "telegram":
+        msg = "telegram tqdm not implemented yet"
+        raise NotImplementedError(msg)
+
     activation = TopK(k=config.k)
 
     # Create data loaders
@@ -71,13 +76,16 @@ def train_sae(
     )
 
     # Print training information
-    if verbose:
-        _print_training_info(
-            config=config,
-            train_set=train_set,
-            activation=activation,
-            n_batches=len(train_loader),
-        )
+    if verbose is not None:
+        if verbose != "telegram":
+            _print_training_info(
+                config=config,
+                train_set=train_set,
+                activation=activation,
+                n_batches=len(train_loader),
+            )
+        else:
+            pass
 
     # Initialize model
     sae = _initialize_sae(
@@ -106,7 +114,7 @@ def train_sae(
             sae=sae,
             optimizer=optimizer,
             train_loader=train_loader,
-            dead_neurons_counts=dead_neurons_counts,
+            dead_latents_counts=dead_neurons_counts,
             config=config,
         )
         batch_train_losses.extend(epoch_batch_losses)
@@ -206,7 +214,7 @@ def _compute_batch_loss(
     sae: SparseAE,
     sae_output: SAEResult,
     x: torch.Tensor,
-    dead_neurons_mask: torch.Tensor,
+    dead_latents_mask: torch.Tensor,
     config: Config,
 ) -> torch.Tensor:
     """Compute the loss for a single batch."""
@@ -216,7 +224,7 @@ def _compute_batch_loss(
         autoencoder=sae,
         x=x,
         sae_output=sae_output,
-        dead_latents_mask=dead_neurons_mask,
+        dead_latents_mask=dead_latents_mask,
         k_aux=config.k_aux,
     )
     batch_loss = loss_top_k(
@@ -232,7 +240,7 @@ def _train_one_epoch(
     sae: DataParallel[SparseAE],
     optimizer: torch.optim.Optimizer,
     train_loader: DataLoader,
-    dead_neurons_counts: torch.Tensor,
+    dead_latents_counts: torch.Tensor,
     config: Config,
 ) -> tuple[list[float], torch.Tensor]:
     """Train the SAE for one epoch.
@@ -251,17 +259,19 @@ def _train_one_epoch(
         result = sae(x)
 
         # Update dead neurons counts and create mask
-        dead_neurons_counts = update_dead_latent_counts(
-            z=result.latents.detach(),
-            prev_counts=dead_neurons_counts.clone(),
+        dead_latents_counts = update_dead_latent_counts(  # Count dead latents in batch
+            activations=result.latents.detach(),
+            prev_counts=dead_latents_counts.clone(),
         )
-        dead_neurons_mask = dead_neurons_counts > config.threshold_dead_latent
+        # The latent is flagged as dead if it's been inactive on more than
+        # config.threshold_dead_latent number of batches
+        dead_latents_mask = dead_latents_counts > config.threshold_dead_latent
 
         batch_loss = _compute_batch_loss(
             sae=sae.module,
             sae_output=result,
             x=x,
-            dead_neurons_mask=dead_neurons_mask,
+            dead_latents_mask=dead_latents_mask,
             config=config,
         )
 
@@ -269,7 +279,7 @@ def _train_one_epoch(
         batch_loss.backward()
         optimizer.step()
 
-    return batch_losses, dead_neurons_counts
+    return batch_losses, dead_latents_counts
 
 
 def _validate_epoch(
@@ -300,7 +310,7 @@ def _validate_epoch(
                 sae=sae.module,
                 sae_output=val_result,
                 x=x_val,
-                dead_neurons_mask=dead_neurons_mask_val,
+                dead_latents_mask=dead_neurons_mask_val,
                 config=config,
             )
             val_losses.append(val_batch_loss.item())
