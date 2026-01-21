@@ -50,6 +50,7 @@ def test_config_save_to_json(config_file: Path) -> None:
         "activation": "topk",
         "k": 128,
         "threshold_dead_latent": 25_000,
+        "device": "cuda",
         "alpha_aux_loss": 1.0 / 32.0,
         "k_aux": 256,
         "batch_size": 256,
