@@ -101,9 +101,10 @@ def update_dead_latent_counts(activations: Tensor, prev_counts: Tensor) -> Tenso
         Updated dead neuron counts for each neuron.
 
     """
+    # 0 is active, 1 is inactive
     dead_mask = _all_except_last_dim(activations == 0).to(dtype=torch.int)
     count = prev_counts * dead_mask  # This resets the count if the latent is active
-    count = prev_counts + dead_mask
+    count += dead_mask
     return count
 
 
